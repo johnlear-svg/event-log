@@ -57,14 +57,16 @@ export default function EventLogApp() {
 
   // Settings
   const [recipientDraft, setRecipientDraft] = useState("");
+  const [allowlist, setAllowlist] = useState<string[]>([]);
 
   useEffect(() => {
     setData(loadData());
     fetch("/api/send-report")
       .then((r) => r.json())
-      .then((d: { mode?: string }) =>
-        setEmailMode(d.mode === "live" ? "live" : "fallback")
-      )
+      .then((d: { mode?: string; allowlist?: string[] }) => {
+        setEmailMode(d.mode === "live" ? "live" : "fallback");
+        setAllowlist(Array.isArray(d.allowlist) ? d.allowlist : []);
+      })
       .catch(() => setEmailMode("fallback"));
   }, []);
 
@@ -285,6 +287,16 @@ export default function EventLogApp() {
     const email = recipientDraft.trim().toLowerCase();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setStatusMsg("Enter a valid email.");
+      return;
+    }
+    if (
+      emailMode === "live" &&
+      allowlist.length > 0 &&
+      !allowlist.includes(email)
+    ) {
+      setStatusMsg(
+        "That address is not on the server allowlist for live email."
+      );
       return;
     }
     if (store.settings.recipients.includes(email)) {
@@ -689,11 +701,26 @@ export default function EventLogApp() {
           className={`banner ${emailMode === "live" ? "banner-ok" : "banner-warn"}`}
         >
           {emailMode === "live"
-            ? "Live email configured (Resend)."
-            : "Fallback mode: PDF download + mailto until RESEND_API_KEY / RESEND_FROM_EMAIL are set."}
+            ? "Live email configured (Resend). Sends only go to allowlisted addresses."
+            : "Fallback mode: PDF download + mailto until Resend and allowlist are set."}
         </div>
 
         {statusMsg && <div className="banner banner-info">{statusMsg}</div>}
+
+        {allowlist.length > 0 && (
+          <div className="panel" style={{ marginBottom: "1rem" }}>
+            <h2 className="panel-title">Allowed for live email</h2>
+            <ul className="list">
+              {allowlist.map((email) => (
+                <li className="list-row" key={email}>
+                  <p className="list-title" style={{ fontFamily: "inherit" }}>
+                    {email}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="panel">
           <ul className="list">
